@@ -4,6 +4,7 @@ import cors from 'cors';
 import connection from '../backend/db.js'
 import fs from 'fs/promises';
 import formatLeagueURL from './helper.js';
+import axios from 'axios';
 
 const app = express();
 const port = 3001;
@@ -82,6 +83,16 @@ app.get('/clubs', (req, res) => {
   });
 });
 
+app.get('/players', (req, res) => {
+  connection.query('SELECT * FROM player', (error, results) => {
+    if (error) {
+      res.status(500).send('Error fetching player');
+      return;
+    }
+    res.json(results);
+  });
+});
+
 app.get('/clubs/:league', (req, res) => {
   const league = req.params.league
   const validLeagues = ['premierleague', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
@@ -103,10 +114,22 @@ app.get('/clubs/:league', (req, res) => {
   });
 });
 
+async function checkIfPlayerExists(fullName, club_id) {
+  const query = `
+    SELECT COUNT(*) AS count
+    FROM player
+    WHERE full_name = ? AND club_id = ?
+  `;
+  const [rows] = await connection.promise().query(query, [fullName, club_id]);
+  return rows[0].count > 0;
+}
+
 
 app.get('/scrape/player', async (req, res) => {
 
-  const url = 'https://www.premierleague.com/clubs/1/Arsenal/squad?se=578'
+  // Player data taken from https://www.premierleague.com/clubs?se=578 - "Squad" section in each club
+  // DONT FORGET UPDATE TEAM ID
+  const url = 'https://www.premierleague.com/clubs/38/Wolverhampton-Wanderers/squad?se=578'
 
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
@@ -120,20 +143,13 @@ app.get('/scrape/player', async (req, res) => {
     let playerImages = [...document.querySelectorAll('.stats-card__player-image img')];
     let playerPosition = [...document.querySelectorAll('.stats-card__player-position')];
 
-    // Remove every second element from the kitNumbers array
+    // Remove every second element from the kitNumbers array due to duplicates
     const filteredKitNumbers = kitNumbers.filter((_, index) => index % 2 === 0);
 
     // Ensure both arrays have the same length
     if (firstNames.length !== lastNames.length || firstNames.length !== filteredKitNumbers.length) {
       console.error('First and last name counts do not match!');
       return [];
-      /*
-      return {
-        first: firstNames.length,
-        last: lastNames.length,
-        numbers: kitNumbers.length
-      }
-      */
     }
 
     // Combine first and last names
@@ -157,7 +173,25 @@ app.get('/scrape/player', async (req, res) => {
     });
   });
 
-  console.log("content: ", content);
+  const CURRENT_CLUB_ID = 20
+  const SEASON = '2023/2024'
+
+
+  for (const player of content) {
+    if (player.full_name && player.last_name && player.kit_number) {
+      const { full_name, first_name, last_name, nation, position, image_url, club_id, kit_number } = player
+      console.log(`Inserting ${full_name} data..`);
+      // Check if player already exists
+      const playerExists = await checkIfPlayerExists(full_name, CURRENT_CLUB_ID); // Change club_id if needed
+      if (!playerExists) {
+        // Player doesn't exist, insert them
+        await insertPlayerData(full_name, first_name, last_name, nation, position, image_url, CURRENT_CLUB_ID, kit_number, SEASON); // Change club_id if needed
+      } else {
+        console.log(`Player ${full_name} already exists in the database. Not adding.`);
+      }
+    }
+  }
+  console.log('All player data has been processed and inserted.');
 
 
   await browser.close();
@@ -165,15 +199,57 @@ app.get('/scrape/player', async (req, res) => {
 
 });
 
-async function insertPlayerData(fullName, firstName, lastName, nation, position, image, club_id, kitNumber) {
+async function insertPlayerData(fullName, firstName, lastName, nation, position, image, club_id, kitNumber, season) {
   const insertQuery = `
-    INSERT INTO club (club_name, league, nation, logo)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO player (full_name, first_name, last_name, nation, position, image, club_id, kit_number, season)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  await connection.promise().query(insertQuery, [clubNameText, "Premier League", "England", clubLogo]);
-  console.log('Scraped data inserted into the club table');
+  console.log(fullName, firstName, lastName, nation, position, image, club_id, kitNumber, season)
+
+
+  await connection.promise().query(insertQuery, [fullName, firstName, lastName, nation, position, image, club_id, kitNumber, season]);
+  console.log(`Player ${fullName} inserted into the club table`);
 }
+
+// Function to update the season for a player
+async function updatePlayerSeason(playerId, season) {
+  const updateQuery = `
+    UPDATE player
+    SET season = ?
+    WHERE id = ?
+  `;
+
+  try {
+    await connection.promise().query(updateQuery, [season, playerId]);
+    console.log(`Player ID ${playerId} updated to season ${season}`);
+  } catch (error) {
+    console.error(`Error updating player ID ${playerId}:`, error);
+  }
+}
+
+// Fetch players and update their season
+async function fetchAndUpdatePlayers() {
+  try {
+    // Fetch all players
+    const response = await axios.get('http://localhost:3001/players');
+    const players = response.data;
+
+    if (!players) return;
+
+    // Loop through each player and update the season
+    for (const player of players) {
+      await updatePlayerSeason(player.id, '2023/2024');
+    }
+
+    console.log('All players updated successfully');
+  } catch (error) {
+    console.error('Error fetching or updating players:', error);
+  }
+  console.log("end")
+}
+
+
 
 
 
