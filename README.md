@@ -1,8 +1,9 @@
 # Football database
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Added:
+- All teams in Premier League season 2023/2024
+- Players from all teams in the Premier League season 2023/2024, except the now relegated teams
 
-Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Working on:
+- Adding teams and players from the teams in another league
