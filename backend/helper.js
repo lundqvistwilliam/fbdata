@@ -5,7 +5,7 @@ export function formatLeagueURL(league) {
       league = 'Premier league'
       break;
     case 'laliga':
-      league = 'LaLIGA EA SPORTS'
+      league = 'LALIGA EA SPORTS'
       break;
     case 'bundesliga':
       league = 'Bundesliga';
