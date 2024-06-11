@@ -3,7 +3,8 @@ import express from 'express'
 import cors from 'cors';
 import connection from '../backend/db.js'
 import fs from 'fs/promises';
-import { formatLeagueURL } from './helper.js';
+import { formatLeagueURL, getClubsByLeagueName } from './helper.js';
+import { insertClubData } from './scrapeHelper.js';
 import axios from 'axios';
 
 const app = express();
@@ -23,16 +24,6 @@ app.get('/scrape/team', async (req, res) => {
       console.log("Sending ", club + "...")
       await insertClubData(club.club_name, club.image_url);
     }
-    //await insertClubData(clubNameText, clubLogo);
-
-    // Insert fetched data into the database
-    /*
-     if (clubNameText && clubLogo) {
-       console.log(`Inserting ${clubNameText} data..`);
-       await insertClubData(clubNameText, clubLogo);
-     }
-    */
-
     // Respond with a success message after all clubs are scraped
     console.log('ALL CLUBS SCRAPED AND DATA INSERTED!')
     res.send('All clubs scraped and data inserted');
@@ -79,15 +70,7 @@ async function fetchClubDataForLaLiga(url) {
   return clubs;
 }
 
-async function insertClubData(clubNameText, clubLogo) {
-  const insertQuery = `
-    INSERT INTO club (club_name, league, nation, logo, season)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  console.log("Inserting: ", clubNameText)
-  await connection.promise().query(insertQuery, [clubNameText, "LALIGA EA SPORTS", "Spain", clubLogo, "2023/2024"]);
-  console.log('Scraped data inserted into the club table');
-}
+
 
 app.get('/clubs', (req, res) => {
   connection.query('SELECT * FROM club', (error, results) => {
@@ -109,8 +92,9 @@ app.get('/players', (req, res) => {
   });
 });
 
-app.get('/clubs/:league', (req, res) => {
-  const league = req.params.league
+
+app.get('/leagues/:leagueName/clubs', (req, res) => {
+  const league = req.params.leagueName
   const validLeagues = ['premierleague', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
 
   if (!validLeagues.includes(league)) {
@@ -119,26 +103,9 @@ app.get('/clubs/:league', (req, res) => {
 
   console.log(league)
   let formattedLeague = formatLeagueURL(league)
+  getClubsByLeagueName(connection, formattedLeague, res)
+})
 
-  connection.query('SELECT * FROM club WHERE league = ?', [formattedLeague], (error, results) => {
-    if (error) {
-      res.status(500).send('Error fetching clubs');
-      return;
-    }
-    console.log("res", results)
-    res.json(results);
-  });
-});
-
-async function checkIfPlayerExists(fullName, club_id) {
-  const query = `
-    SELECT COUNT(*) AS count
-    FROM player
-    WHERE full_name = ? AND club_id = ?
-  `;
-  const [rows] = await connection.promise().query(query, [fullName, club_id]);
-  return rows[0].count > 0;
-}
 
 
 app.get('/scrape/player', async (req, res) => {
@@ -198,7 +165,7 @@ app.get('/scrape/player', async (req, res) => {
       const { full_name, first_name, last_name, nation, position, image_url, club_id, kit_number } = player
       console.log(`Inserting ${full_name} data..`);
       // Check if player already exists
-      const playerExists = await checkIfPlayerExists(full_name, CURRENT_CLUB_ID); // Change club_id if needed
+      const playerExists = await checkIfPlayerExists(connection, full_name, CURRENT_CLUB_ID); // Change club_id if needed
       if (!playerExists) {
         // Player doesn't exist, insert them
         await insertPlayerData(full_name, first_name, last_name, nation, position, image_url, CURRENT_CLUB_ID, kit_number, SEASON); // Change club_id if needed
