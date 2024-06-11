@@ -3,7 +3,7 @@ import express from 'express'
 import cors from 'cors';
 import connection from '../backend/db.js'
 import fs from 'fs/promises';
-import formatLeagueURL from './helper.js';
+import { formatLeagueURL } from './helper.js';
 import axios from 'axios';
 
 const app = express();
@@ -13,28 +13,25 @@ app.use(cors());
 
 app.get('/scrape/team', async (req, res) => {
   try {
-    // Read club URLs from the JSON file
-    const clubUrls = JSON.parse(await fs.readFile('../src/teams.json', 'utf-8'));
+    const url = 'https://www.laliga.com/en-GB/laliga-easports/clubs'
+    console.log(`Scraping URL: ${url}...`);
 
-    if (clubUrls.length === 0) {
-      console.log("no teams to scrape.")
-      res.status(500).send('Error scraping data. Error: No teams added');
-      return null;
+    // Fetch data from the URL
+    const clubs = await fetchClubDataForLaLiga(url);
+    console.log("clubs2", clubs);
+    for (const club of clubs) {
+      console.log("Sending ", club + "...")
+      await insertClubData(club.club_name, club.image_url);
     }
+    //await insertClubData(clubNameText, clubLogo);
 
-    for (const url of clubUrls) {
-      console.log(`Scraping URL: ${url}...`);
-
-      // Fetch data from the URL
-      const { clubNameText, clubLogo } = await fetchClubData(url);
-      console.log({ clubNameText, clubLogo });
-
-      // Insert fetched data into the database
-      if (clubNameText && clubLogo) {
-        console.log(`Inserting ${clubNameText} data..`);
-        await insertClubData(clubNameText, clubLogo);
-      }
-    }
+    // Insert fetched data into the database
+    /*
+     if (clubNameText && clubLogo) {
+       console.log(`Inserting ${clubNameText} data..`);
+       await insertClubData(clubNameText, clubLogo);
+     }
+    */
 
     // Respond with a success message after all clubs are scraped
     console.log('ALL CLUBS SCRAPED AND DATA INSERTED!')
@@ -43,12 +40,15 @@ app.get('/scrape/team', async (req, res) => {
     console.error('Error scraping data:', error);
     res.status(500).send('Error scraping data');
   }
+
 });
 
-async function fetchClubData(url) {
+async function fetchClubDataForLaLiga(url) {
+  // LEAGUE NAME : LALIGA EA SPORTS
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'networkidle2' });
+  /*
 
   const [el] = await page.$$('xpath/.//*[@id="mainContent"]/header/div[1]/div/h2');
   const text = await el?.getProperty("textContent");
@@ -57,19 +57,35 @@ async function fetchClubData(url) {
   const [el2] = await page.$$('xpath/.//*[@id="mainContent"]/header/div[1]/img');
   const logo = await el2?.getProperty("src");
   const clubLogo = await logo?.jsonValue();
+  */
+  let clubs = await page.evaluate(() => {
+    let clubNameElements1 = [...document.querySelectorAll('.styled__TextStyled-sc-1mby3k1-0.eaZimx')];
+    let clubNameElements2 = [...document.querySelectorAll('.styled__TextStyled-sc-1mby3k1-0.kYCCIm')]
+    let clubLogoElements = [...document.querySelectorAll('.styled__ImageStyled-sc-17v9b6o-0.coeclD')];
+
+    let clubNameElements = [...clubNameElements1, ...clubNameElements2];
+
+    return clubNameElements.map((clubNameElement, index) => {
+      let club_name = clubNameElement.textContent.trim();
+      let image_url = clubLogoElements[index]?.getAttribute('src') || null;
+      if (!image_url) {
+        console.log(`No logo found for club: ${club_name}`);
+      }
+      return { club_name, image_url };
+    });
+  });
 
   await browser.close();
-
-  return { clubNameText, clubLogo };
+  return clubs;
 }
 
 async function insertClubData(clubNameText, clubLogo) {
   const insertQuery = `
-    INSERT INTO club (club_name, league, nation, logo)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO club (club_name, league, nation, logo, season)
+    VALUES (?, ?, ?, ?, ?)
   `;
-
-  await connection.promise().query(insertQuery, [clubNameText, "Premier League", "England", clubLogo]);
+  console.log("Inserting: ", clubNameText)
+  await connection.promise().query(insertQuery, [clubNameText, "LALIGA EA SPORTS", "Spain", clubLogo, "2023/2024"]);
   console.log('Scraped data inserted into the club table');
 }
 
