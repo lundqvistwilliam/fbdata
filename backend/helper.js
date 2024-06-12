@@ -41,7 +41,6 @@ export function getClubsByLeagueName(connection, formattedLeague, res) {
       res.status(500).send('Error fetching clubs');
       return;
     }
-    console.log("res", results)
     res.json(results);
   });
 }

@@ -2,9 +2,8 @@ import puppeteer from 'puppeteer';
 import express from 'express'
 import cors from 'cors';
 import connection from '../backend/db.js'
-import fs from 'fs/promises';
 import { formatLeagueURL, getClubsByLeagueName } from './helper.js';
-import { insertClubData } from './scrapeHelper.js';
+import { insertClubData, scrapePlayerDataFromJSONFile } from './scrapeHelper.js';
 import axios from 'axios';
 
 const app = express();
@@ -34,41 +33,6 @@ app.get('/scrape/team', async (req, res) => {
 
 });
 
-async function fetchClubDataForLaLiga(url) {
-  // LEAGUE NAME : LALIGA EA SPORTS
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto(url, { waitUntil: 'networkidle2' });
-  /*
-
-  const [el] = await page.$$('xpath/.//*[@id="mainContent"]/header/div[1]/div/h2');
-  const text = await el?.getProperty("textContent");
-  const clubNameText = await text?.jsonValue();
-
-  const [el2] = await page.$$('xpath/.//*[@id="mainContent"]/header/div[1]/img');
-  const logo = await el2?.getProperty("src");
-  const clubLogo = await logo?.jsonValue();
-  */
-  let clubs = await page.evaluate(() => {
-    let clubNameElements1 = [...document.querySelectorAll('.styled__TextStyled-sc-1mby3k1-0.eaZimx')];
-    let clubNameElements2 = [...document.querySelectorAll('.styled__TextStyled-sc-1mby3k1-0.kYCCIm')]
-    let clubLogoElements = [...document.querySelectorAll('.styled__ImageStyled-sc-17v9b6o-0.coeclD')];
-
-    let clubNameElements = [...clubNameElements1, ...clubNameElements2];
-
-    return clubNameElements.map((clubNameElement, index) => {
-      let club_name = clubNameElement.textContent.trim();
-      let image_url = clubLogoElements[index]?.getAttribute('src') || null;
-      if (!image_url) {
-        console.log(`No logo found for club: ${club_name}`);
-      }
-      return { club_name, image_url };
-    });
-  });
-
-  await browser.close();
-  return clubs;
-}
 
 
 
@@ -81,6 +45,26 @@ app.get('/clubs', (req, res) => {
     res.json(results);
   });
 });
+
+app.get('/leagues/:leagueName/players', (req, res) => {
+  const leagueName = req.params.leagueName;
+  const validLeagues = ['premierleague', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
+
+  if (!validLeagues.includes(leagueName)) {
+    return res.status(400).send('Invalid league');
+  }
+  let formattedLeague = formatLeagueURL(leagueName)
+
+  connection.query('SELECT p.* FROM player p INNER JOIN club c ON p.club_id = c.id WHERE c.league = ?', [formattedLeague], (error, results) => {
+    if (error) {
+      res.status(500).send('Error fetching players');
+      return;
+    }
+    res.json(results);
+  });
+});
+
+
 
 app.get('/players', (req, res) => {
   connection.query('SELECT * FROM player', (error, results) => {
@@ -100,8 +84,6 @@ app.get('/leagues/:leagueName/clubs', (req, res) => {
   if (!validLeagues.includes(league)) {
     return res.status(400).send('Invalid league');
   }
-
-  console.log(league)
   let formattedLeague = formatLeagueURL(league)
   getClubsByLeagueName(connection, formattedLeague, res)
 })
@@ -110,90 +92,9 @@ app.get('/leagues/:leagueName/clubs', (req, res) => {
 
 app.get('/scrape/player', async (req, res) => {
 
-  // Player data taken from https://www.premierleague.com/clubs?se=578 - "Squad" section in each club
-  // DONT FORGET UPDATE TEAM ID
-  const url = 'https://www.premierleague.com/clubs/38/Wolverhampton-Wanderers/squad?se=578'
-
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto(url, { waitUntil: 'networkidle2' });
-
-  let content = await page.evaluate(() => {
-    let firstNames = [...document.querySelectorAll('.stats-card__player-first')];
-    let lastNames = [...document.querySelectorAll('.stats-card__player-last')];
-    let kitNumbers = [...document.querySelectorAll('.stats-card__squad-number')];
-    let playerNation = [...document.querySelectorAll('.stats-card__player-country')];
-    let playerImages = [...document.querySelectorAll('.stats-card__player-image img')];
-    let playerPosition = [...document.querySelectorAll('.stats-card__player-position')];
-
-    // Remove every second element from the kitNumbers array due to duplicates
-    const filteredKitNumbers = kitNumbers.filter((_, index) => index % 2 === 0);
-
-    // Ensure both arrays have the same length
-    if (firstNames.length !== lastNames.length || firstNames.length !== filteredKitNumbers.length) {
-      console.error('First and last name counts do not match!');
-      return [];
-    }
-
-    // Combine first and last names
-    return firstNames.map((firstName, index) => {
-      let first = firstName.textContent.trim();
-      let last = lastNames[index].textContent.trim();
-      let kitNumber = filteredKitNumbers[index].textContent;
-      let nation = playerNation[index].textContent;
-      let imageUrl = playerImages[index]?.getAttribute('src');
-      let position = playerPosition[index].textContent;
-
-      return {
-        full_name: `${first} ${last}`,
-        first_name: first || null,
-        last_name: last,
-        kit_number: kitNumber,
-        nation: nation,
-        position: position,
-        image_url: imageUrl || null,
-      };
-    });
-  });
-
-  const CURRENT_CLUB_ID = 20
-  const SEASON = '2023/2024'
-
-
-  for (const player of content) {
-    if (player.full_name && player.last_name && player.kit_number) {
-      const { full_name, first_name, last_name, nation, position, image_url, club_id, kit_number } = player
-      console.log(`Inserting ${full_name} data..`);
-      // Check if player already exists
-      const playerExists = await checkIfPlayerExists(connection, full_name, CURRENT_CLUB_ID); // Change club_id if needed
-      if (!playerExists) {
-        // Player doesn't exist, insert them
-        await insertPlayerData(full_name, first_name, last_name, nation, position, image_url, CURRENT_CLUB_ID, kit_number, SEASON); // Change club_id if needed
-      } else {
-        console.log(`Player ${full_name} already exists in the database. Not adding.`);
-      }
-    }
-  }
-  console.log('All player data has been processed and inserted.');
-
-
-  await browser.close();
-  res.send(content)
-
+  await scrapePlayerDataFromJSONFile();
 });
 
-async function insertPlayerData(fullName, firstName, lastName, nation, position, image, club_id, kitNumber, season) {
-  const insertQuery = `
-    INSERT INTO player (full_name, first_name, last_name, nation, position, image, club_id, kit_number, season)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  console.log(fullName, firstName, lastName, nation, position, image, club_id, kitNumber, season)
-
-
-  await connection.promise().query(insertQuery, [fullName, firstName, lastName, nation, position, image, club_id, kitNumber, season]);
-  console.log(`Player ${fullName} inserted into the club table`);
-}
 
 // Function to update the season for a player
 async function updatePlayerSeason(playerId, season) {
