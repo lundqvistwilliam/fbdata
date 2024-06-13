@@ -3,7 +3,7 @@ import express from 'express'
 import cors from 'cors';
 import connection from '../backend/db.js'
 import { formatLeagueURL, getClubsByLeagueName } from './helper.js';
-import { insertClubData, scrapePlayerDataFromJSONFile } from './scrapeHelper.js';
+import { insertClubData, scrapePlayerDataFromJSONFile, fetchClubDataForBundesliga, scrapePlayerDataForBundesliga } from './scrapeHelper.js';
 import axios from 'axios';
 
 const app = express();
@@ -13,16 +13,18 @@ app.use(cors());
 
 app.get('/scrape/team', async (req, res) => {
   try {
-    const url = 'https://www.laliga.com/en-GB/laliga-easports/clubs'
+    const url = 'https://www.bundesliga.com/en/bundesliga/clubs'
     console.log(`Scraping URL: ${url}...`);
 
     // Fetch data from the URL
-    const clubs = await fetchClubDataForLaLiga(url);
-    console.log("clubs2", clubs);
+    const clubs = await fetchClubDataForBundesliga(url);
+    console.log("get", clubs)
+
     for (const club of clubs) {
       console.log("Sending ", club + "...")
-      await insertClubData(club.club_name, club.image_url);
+      await insertClubData(connection, club.club_name, club.image_url);
     }
+
     // Respond with a success message after all clubs are scraped
     console.log('ALL CLUBS SCRAPED AND DATA INSERTED!')
     res.send('All clubs scraped and data inserted');
@@ -91,7 +93,8 @@ app.get('/leagues/:leagueName/clubs', (req, res) => {
 
 
 app.get('/scrape/player', async (req, res) => {
-
+  const url = 'https://www.bundesliga.com/en/bundesliga/clubs/fc-bayern-muenchen'
+  //await scrapePlayerDataForBundesliga(url);
   await scrapePlayerDataFromJSONFile();
 });
 
