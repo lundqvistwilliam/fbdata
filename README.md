@@ -10,7 +10,7 @@
 - Players from all teams in the LA LIGA EA SPORTS season 2023/2024 (662 players)
 
 <img src="https://flagpedia.net/data/flags/w702/de.webp" width="25" height="25">  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSr_Yz_W4t2xki-9Kka7UYCko5FnB9-6QzdoQ&s" width="25" height="25"> 
-- All teams in Bundesliga 2023/2024.
+- All teams in Bundesliga season 2023/2024.
 - Players from all teams in the Bundesliga season 2023/2024 (551 players)
 &nbsp;
 &nbsp;
