@@ -12,6 +12,10 @@
 <img src="https://flagpedia.net/data/flags/w702/de.webp" width="25" height="25">  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSr_Yz_W4t2xki-9Kka7UYCko5FnB9-6QzdoQ&s" width="25" height="25"> 
 - All teams in Bundesliga season 2023/2024.
 - Players from all teams in the Bundesliga season 2023/2024 (551 players)
+
+<img src="https://flagpedia.net/data/flags/w702/it.webp" width="25" height="25">  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa4X4Oa75oDFLlBG-SWbuHOEpXDsXgYfH-XA&s" width="25" height="25"> 
+- All teams in Serie A season 2023/2024.
+- Players from all teams in the Serie A season 2023/2024 (545 players)
 &nbsp;
 &nbsp;
 
