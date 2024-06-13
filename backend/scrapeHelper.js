@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import puppeteer from 'puppeteer';
 import connection from './db.js';
 import { NATIONALITY_MAP } from './nationalityMap.js';
+import pLimit from 'p-limit';
+
+const limit = pLimit(5); // Limit concurrency to 5
 
 // Used in /scrape/club
 export async function scrapeClubDataFromURL() {
@@ -22,11 +25,13 @@ export async function scrapeClubDataFromURL() {
       const { clubNameText, clubLogo } = await fetchClubData(url);
       console.log({ clubNameText, clubLogo });
 
+      /*
       // Insert fetched data into the database
       if (clubNameText && clubLogo) {
         console.log(`Inserting ${clubNameText} data..`);
         await insertClubData(clubNameText, clubLogo);
       }
+      */
     }
 
     // Respond with a success message after all clubs are scraped
@@ -38,7 +43,7 @@ export async function scrapeClubDataFromURL() {
   }
 }
 
-export async function scrapePlayerDataFromJSONFile() {
+export async function scrapePlayerDataFromJSONFile2() {
   try {
     // Read club URLs from the JSON file
     const playersUrl = JSON.parse(await fs.readFile('./players.json', 'utf-8'));
@@ -55,12 +60,14 @@ export async function scrapePlayerDataFromJSONFile() {
       // Fetch data from the URL
       const playerData = await scrapePlayerData(url);
 
+
       // Insert fetched data into the database
 
       if (playerData && playerData?.full_name) {
         console.log(`Inserting ${playerData.full_name}..`);
         await insertPlayerData(playerData);
       }
+
 
     }
 
@@ -75,6 +82,51 @@ export async function scrapePlayerDataFromJSONFile() {
   } catch (error) {
     console.error('Error scraping data:', error);
     //res.status(500).send('Error scraping data');
+  }
+}
+
+export async function scrapePlayerDataFromJSONFile() {
+  try {
+    // Read club URLs from the JSON file
+    const playersUrl = JSON.parse(await fs.readFile('./players.json', 'utf-8'));
+
+    if (playersUrl.length === 0) {
+      console.log("No players to scrape.");
+      // Assuming `res` is defined somewhere in your code
+      res.status(500).send('Error scraping data. Error: No players added');
+      return null;
+    }
+
+    const scrapePromises = playersUrl.map(url => limit(() => scrapeAndInsertPlayerData(url)));
+
+    await Promise.all(scrapePromises);
+
+    console.log('ALL CLUBS SCRAPED AND DATA INSERTED!');
+    console.log("------------------------------------------------------------------------------------------------------------------------------------------");
+    console.log("--                                                                                                                                     --");
+    console.log("------------------------------------------!! E   N  D !!----------------------------------------------------------------------------------");
+    console.log("--                                                                                                                                     --");
+    console.log("------------------------------------------------------------------------------------------------------------------------------------------");
+
+  } catch (error) {
+    console.error('Error scraping data:', error);
+    // Assuming `res` is defined somewhere in your code
+    res.status(500).send('Error scraping data');
+  }
+}
+
+async function scrapeAndInsertPlayerData(url) {
+  console.log(`Scraping URL for player: ${url}...`);
+
+  try {
+    const playerData = await scrapePlayerData(url);
+
+    if (playerData && playerData.full_name) {
+      console.log(`Inserting ${playerData.full_name}..`);
+      await insertPlayerData(playerData);
+    }
+  } catch (error) {
+    console.error(`Error scraping or inserting player data from ${url}:`, error);
   }
 }
 
@@ -106,13 +158,13 @@ async function fetchClubDataForLaLiga(url) {
   return clubs;
 }
 
-export async function fetchClubDataForBundesliga(url) {
+export async function fetchClubData(url) {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'networkidle2' });
 
   let clubs = await page.evaluate(() => {
-    let clubNameElements = [...document.querySelectorAll('.club')];
+    let clubNameElements = [...document.querySelectorAll('.semibold .white .h3 .line-clamp .line-1')];
     let clubLogoElements = [...document.querySelectorAll('.logo')];
 
     return clubNameElements.map((clubNameElement, index) => {
@@ -136,8 +188,8 @@ async function convertNationality(adjective) {
 }
 
 export async function scrapePlayerData(url) {
-  // USED FOR LALIGA EA SPORTS (2024-06-12)
-  const CURRENT_CLUB_ID = 58
+  // USED FOR LALIGA EA SPORTS and Bundesliga (2024-06-12)
+  const CURRENT_CLUB_ID = 64
   const SEASON = '2023/2024'
   // DONT FORGET UPDATE TEAM ID
   const browser = await puppeteer.launch();
@@ -152,31 +204,37 @@ export async function scrapePlayerData(url) {
   const playerNameText = await text?.jsonValue();
   */
 
-  const [firstNameEl] = await page.$$('xpath/.//*[@id="default"]/div/player-page/article/header/div[2]/div/div/div[1]/div/h1/div[1]');
+  const [firstNameEl] = await page.$$('xpath/.//*[@id="main"]/div[2]/div[2]/div/div/h2');
   const firstText = await firstNameEl?.getProperty("textContent");
   const firstNameText = await firstText?.jsonValue();
 
-  const [lastNameEl] = await page.$$('xpath/.//*[@id="default"]/div/player-page/article/header/div[2]/div/div/div[1]/div/h1/div[2]');
+  const [lastNameEl] = await page.$$('xpath/.//*[@id="main"]/div[2]/div[2]/div/div/h3');
   const lastText = await lastNameEl?.getProperty("textContent");
   const lastNameText = await lastText?.jsonValue();
 
-  const [nationEl] = await page.$$('xpath/.//*[@id="default"]/div/player-page/article/header/div[2]/div/div/div[2]/div/div/div/div[4]/span[2]/nationality-flags/span[1]')
+  const [nationEl] = await page.$$('xpath/.//*[@id="nationality"]')
   const nation = await nationEl?.getProperty("textContent");
   const nationText = await nation?.jsonValue();
 
-  const [positionEl] = await page.$$('xpath/.//*[@id="default"]/div/player-page/article/header/div[2]/div/div/div[2]/div/div/div/div[2]/span[2]')
+  const [positionEl] = await page.$$('xpath/.//*[@id="main"]/div[4]/div/div/div[2]/h3[2]')
   const position = await positionEl?.getProperty("textContent");
   const positionText = await position?.jsonValue();
 
-  const [imageEl] = await page.$$('xpath/.//*[@id="default"]/div/player-page/article/header/div[3]/div[2]/player-image/img');
+  const [imageEl] = await page.$$('xpath/.//*[@id="main"]/div[2]/div[2]/div/div/img');
   const playerImage = await imageEl?.getProperty("src");
   const playerImageUrl = await playerImage?.jsonValue();
 
-  const [numberEl] = await page.$$('xpath/.//*[@id="default"]/div/player-page/article/header/div[2]/div/div/div[1]/div/div');
+  const [numberEl] = await page.$$('xpath/.//*[@id="main"]/div[2]/div[2]/div/div/h1');
   const playerNumber = await numberEl?.getProperty("textContent");
   const playerNumberText = await playerNumber?.jsonValue();
 
   const nationConverted = await convertNationality(nationText.trim());
+
+  if (playerImageUrl === 'https://img.legaseriea.it/frontend/nomad_level3-1f40cddd8616046258232405c8d252bdccd0ef82/public/images/placeholder/player_placeholder.png') {
+    await browser.close();
+    console.log("No player image, ending")
+    return null;
+  }
 
 
   const playerData = {
@@ -191,7 +249,7 @@ export async function scrapePlayerData(url) {
     club_id: CURRENT_CLUB_ID,
     season: SEASON
   };
-  console.log("player: ", playerData)
+  //console.log("player: ", playerData)
   await browser.close();
   return playerData;
   res.send(content)
