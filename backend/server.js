@@ -13,7 +13,7 @@ app.use(cors());
 
 app.get('/scrape/team', async (req, res) => {
   try {
-    const url = 'https://www.legaseriea.it/en'
+    const url = 'https://www.ligue1.com/clubs/List'
     console.log(`Scraping URL: ${url}...`);
 
     // Fetch data from the URL
@@ -95,8 +95,6 @@ app.get('/leagues/:leagueName/clubs', (req, res) => {
 
 
 app.get('/scrape/player', async (req, res) => {
-  const url = 'https://www.bundesliga.com/en/bundesliga/clubs/fc-bayern-muenchen'
-  //await scrapePlayerDataForBundesliga(url);
   await scrapePlayerDataFromJSONFile();
 });
 
