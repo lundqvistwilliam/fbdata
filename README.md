@@ -1,4 +1,5 @@
 # Football database
+# All teams and players from the top 5 leagues added
 
 ## Added:
  <img src="https://flagpedia.net/data/flags/w702/gb-eng.webp" width="25" height="25">  <img src="https://www.premierleague.com/resources/rebrand/v7.147.3/i/elements/pl-main-logo.png" width="25" height="25"> 
@@ -16,6 +17,10 @@
 <img src="https://flagpedia.net/data/flags/w702/it.webp" width="25" height="25">  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa4X4Oa75oDFLlBG-SWbuHOEpXDsXgYfH-XA&s" width="25" height="25"> 
 - All teams in Serie A season 2023/2024.
 - Players from all teams in the Serie A season 2023/2024 (545 players)
+
+<img src="https://flagpedia.net/data/flags/w702/fr.webp" width="25" height="25">  <img src="https://upload.wikimedia.org/wikipedia/commons/f/fb/Ligue1_logo.png" width="25" height="25"> 
+- All teams in Ligue 1 season 2023/2024.
+- Players from all teams in the Ligue 1 season 2023/2024 (481 players)
 &nbsp;
 &nbsp;
 
