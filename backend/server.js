@@ -1,43 +1,13 @@
-import puppeteer from 'puppeteer';
-import express from 'express'
+import express from 'express';
 import cors from 'cors';
-import connection from '../backend/db.js'
+import connection from '../backend/db.js';
 import { formatLeagueURL, getClubsByLeagueName } from './helper.js';
-import { insertClubData, scrapePlayerDataFromJSONFile, fetchClubData, scrapePlayerDataForBundesliga } from './scrapeHelper.js';
 import axios from 'axios';
 
 const app = express();
 const port = 3001;
 
 app.use(cors());
-
-app.get('/scrape/team', async (req, res) => {
-  try {
-    const url = 'https://www.ligue1.com/clubs/List'
-    console.log(`Scraping URL: ${url}...`);
-
-    // Fetch data from the URL
-    const clubs = await fetchClubData(url);
-    console.log("get", clubs)
-
-    /*
-    for (const club of clubs) {
-      console.log("Sending ", club + "...")
-      await insertClubData(connection, club.club_name, club.image_url);
-    }
-    */
-
-    // Respond with a success message after all clubs are scraped
-    console.log('ALL CLUBS SCRAPED AND DATA INSERTED!')
-    res.send('All clubs scraped and data inserted');
-  } catch (error) {
-    console.error('Error scraping data:', error);
-    res.status(500).send('Error scraping data');
-  }
-
-});
-
-
 
 
 app.get('/clubs', (req, res) => {
@@ -57,7 +27,7 @@ app.get('/leagues/:leagueName/players', (req, res) => {
   if (!validLeagues.includes(leagueName)) {
     return res.status(400).send('Invalid league');
   }
-  let formattedLeague = formatLeagueURL(leagueName)
+  let formattedLeague = formatLeagueURL(leagueName);
 
   connection.query('SELECT p.* FROM player p INNER JOIN club c ON p.club_id = c.id WHERE c.league = ?', [formattedLeague], (error, results) => {
     if (error) {
@@ -82,22 +52,23 @@ app.get('/players', (req, res) => {
 
 
 app.get('/leagues/:leagueName/clubs', (req, res) => {
-  const league = req.params.leagueName
+  const league = req.params.leagueName;
   const validLeagues = ['premierleague', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
 
   if (!validLeagues.includes(league)) {
     return res.status(400).send('Invalid league');
   }
-  let formattedLeague = formatLeagueURL(league)
-  getClubsByLeagueName(connection, formattedLeague, res)
-})
+  let formattedLeague = formatLeagueURL(league);
+  getClubsByLeagueName(connection, formattedLeague, res);
+});
 
 
-
+/***********  REMOVE ////////////////////////
+/*
 app.get('/scrape/player', async (req, res) => {
   await scrapePlayerDataFromJSONFile();
 });
-
+*/
 
 // Function to update the season for a player
 async function updatePlayerSeason(playerId, season) {
@@ -133,7 +104,7 @@ async function fetchAndUpdatePlayers() {
   } catch (error) {
     console.error('Error fetching or updating players:', error);
   }
-  console.log("end")
+  console.log("end");
 }
 
 
