@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import getAllClubs from './api/apiHelper';
 
 // Test to see it working
+// TODO REMOVE THIS
 
 const ProductScraper = () => {
   const [clubs, setClubs] = useState([]);
@@ -11,7 +12,7 @@ const ProductScraper = () => {
   const fetchClubs = async () => {
     try {
       const response = await getAllClubs();
-      console.log("response?", response)
+      console.log("response?", response);
       setClubs(response);
       setLoading(false);
     } catch (error) {
@@ -44,9 +45,9 @@ const ProductScraper = () => {
           <h2>Club name: {club.club_name}</h2>
           <h2>League: {club.league}</h2>
         </div>
-      )
-    })
-  }
+      );
+    });
+  };
 
   return (
     <div>

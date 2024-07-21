@@ -8,6 +8,7 @@ const app = express();
 const port = 3001;
 
 app.use(cors());
+// cd backend - node serverjs
 
 
 app.get('/clubs', (req, res) => {
@@ -29,7 +30,15 @@ app.get('/leagues/:leagueName/players', (req, res) => {
   }
   let formattedLeague = formatLeagueURL(leagueName);
 
-  connection.query('SELECT p.* FROM player p INNER JOIN club c ON p.club_id = c.id WHERE c.league = ?', [formattedLeague], (error, results) => {
+  let query = 'SELECT p.*, c.club_name FROM player p INNER JOIN club c ON p.club_id = c.id WHERE c.league = ?';
+  let params = [formattedLeague];
+
+  if (leagueName === 'premierleague') {
+    query += ' AND p.image != ?';
+    params.push('https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png');
+  }
+
+  connection.query(query, params, (error, results) => {
     if (error) {
       res.status(500).send('Error fetching players');
       return;
