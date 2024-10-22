@@ -47,6 +47,127 @@ app.get('/leagues/:leagueName/players', (req, res) => {
   });
 });
 
+app.get('/api/leagues/:leagueName/players', (req, res) => {
+  let formattedLeague = formatLeagueURL(req.params.leagueName);
+  const leagueName = formattedLeague;
+
+  const sqlQuery = `
+    SELECT 
+      p.id, 
+      p.full_name, 
+      p.first_name, 
+      p.last_name, 
+      p.nationality, 
+      p.position,
+      h.team_name, 
+      h.season, 
+      h.competition
+    FROM players_info p
+    JOIN player_team_history h ON p.id = h.player_id
+    WHERE EXISTS (
+      SELECT 1 
+      FROM player_team_history h2 
+      WHERE h2.player_id = p.id 
+      AND h2.competition = ? 
+      AND h2.season = '2024-2025'
+    )
+    ORDER BY p.id, h.season DESC;
+  `;
+
+  connection.query(sqlQuery, [leagueName], (err, results) => {
+    if (err) {
+      // Handle errors
+      console.error('Error executing query', err);
+      res.status(500).send('Server error');
+    } else {
+      const players = {};
+
+      results.forEach(row => {
+        if (!players[row.id]) {
+          players[row.id] = {
+            id: row.id,
+            full_name: row.full_name,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            nationality: row.nationality,
+            position: row.position,
+            team_history: []
+          };
+        }
+
+        players[row.id].team_history.push({
+          team: row.team_name,
+          season: row.season,
+          competition: row.competition
+        });
+      });
+
+      const playersArray = Object.values(players);
+
+      res.json(playersArray);
+    }
+  });
+});
+
+// TODO : With different leagues, now only PL
+app.get('/api/random/players', (req, res) => {
+  /*
+  const query = `
+  SELECT * 
+  FROM players_info 
+  ORDER BY RAND() 
+  LIMIT 42;`;
+  */
+
+  const query = `SELECT 
+    p.id, 
+    p.full_name, 
+    p.first_name, 
+    p.last_name, 
+    p.nationality, 
+    p.position,
+    JSON_ARRAYAGG(
+        JSON_OBJECT(
+            'team', h.team_name,
+            'competition', h.competition,
+            'season', h.season
+        )
+    ) AS team_history
+FROM (
+    SELECT 
+        id, 
+        full_name, 
+        first_name, 
+        last_name, 
+        nationality, 
+        position
+    FROM players_info 
+    ORDER BY RAND() 
+    LIMIT 42
+) AS p
+JOIN player_team_history h ON p.id = h.player_id
+WHERE EXISTS (
+    SELECT 1 
+    FROM player_team_history h2 
+    WHERE h2.player_id = p.id 
+    AND h2.competition = 'Premier League'
+    AND h2.season = '2024-2025'
+)
+GROUP BY p.id
+ORDER BY MAX(h.season) DESC;  -- Order by the latest season
+
+`;
+  connection.query(query, (error, results) => {
+    if (error) {
+      console.log("Error", error);
+      res.status(500).send('Error fetching player');
+      return;
+    }
+    res.json(results);
+  });
+});
+
+
 
 
 app.get('/players', (req, res) => {
