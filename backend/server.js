@@ -118,6 +118,48 @@ app.get('/api/random/players', (req, res) => {
   ORDER BY RAND() 
   LIMIT 42;`;
   */
+  // 70 before
+
+  /*
+  const query = `SELECT 
+    p.id, 
+    p.full_name, 
+    p.first_name, 
+    p.last_name, 
+    p.nationality, 
+    p.position,
+    JSON_ARRAYAGG(
+        JSON_OBJECT(
+            'team', h.team_name,
+            'competition', h.competition,
+            'season', h.season
+        )
+    ) AS team_history
+FROM (
+    SELECT 
+        id, 
+        full_name, 
+        first_name, 
+        last_name, 
+        nationality, 
+        position
+    FROM players_info 
+    ORDER BY RAND() 
+    LIMIT 100
+) AS p
+JOIN player_team_history h ON p.id = h.player_id
+WHERE EXISTS (
+    SELECT 1 
+    FROM player_team_history h2 
+    WHERE h2.player_id = p.id 
+    AND h2.competition = 'Premier League'
+    AND h2.season = '2024-2025'
+)
+GROUP BY p.id
+ORDER BY MAX(h.season) DESC;  -- Order by the latest season
+
+`;
+*/
 
   const query = `SELECT 
     p.id, 
@@ -143,20 +185,20 @@ FROM (
         position
     FROM players_info 
     ORDER BY RAND() 
-    LIMIT 42
+    LIMIT 200  
 ) AS p
 JOIN player_team_history h ON p.id = h.player_id
 WHERE EXISTS (
     SELECT 1 
     FROM player_team_history h2 
     WHERE h2.player_id = p.id 
-    AND h2.competition = 'Premier League'
+    AND h2.competition IN ('Premier League', 'La Liga')
     AND h2.season = '2024-2025'
 )
 GROUP BY p.id
-ORDER BY MAX(h.season) DESC;  -- Order by the latest season
-
+ORDER BY MAX(h.season) DESC;
 `;
+
   connection.query(query, (error, results) => {
     if (error) {
       console.log("Error", error);
